@@ -6,4 +6,6 @@ import org.springframework.data.repository.CrudRepository;
 public interface JobExecutionHistoryRepository extends CrudRepository<JobExecutionHistory, Long> {
 
     JobExecutionHistory findTopByJobNameOrderByCompletionDateDesc(String jobName);
+
+    void deleteAllByJobName(String jobName);
 }

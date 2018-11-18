@@ -1,9 +1,8 @@
-package com.ail.optile.jobservice;
+package com.ail.optile.jobservice.rest;
 
 import com.ail.optile.jobservice.domain.Job;
 import com.ail.optile.jobservice.exception.JobIsCurrentlyRunningException;
 import com.ail.optile.jobservice.exception.JobNotFoundException;
-import com.ail.optile.jobservice.rest.JobServiceRestController;
 import com.ail.optile.jobservice.service.JobService;
 import com.google.common.collect.ImmutableList;
 import org.dozer.DozerBeanMapper;

@@ -12,6 +12,7 @@ import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.utils.Key;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -65,6 +66,7 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    @Transactional
     public void update(Job job) {
         try {
             checkJobExists(job.getName());
@@ -83,11 +85,13 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
+    @Transactional
     public void delete(String jobName) {
         try {
             checkJobExists(jobName);
 
             scheduler.deleteJob(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
+            historyRepository.deleteAllByJobName(jobName);
             log.info("Job '{}' deleted", jobName);
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
@@ -177,7 +181,6 @@ public class JobServiceImpl implements JobService {
             }
         }
 
-        // if job wasn't run yet then it's queued
         return Job.State.QUEUED;
     }
 

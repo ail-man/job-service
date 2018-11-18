@@ -11,19 +11,36 @@
 * https://medium.com/@himsmittal/quartz-plugins-a-must-have-for-all-quartz-implementations-7ca01e98e620
 * https://www.concretepage.com/spring-boot/spring-boot-crudrepository-example
 * http://www.springboottutorial.com/spring-boot-exception-handling-for-rest-services
+* https://www.freeformatter.com/cron-expression-generator-quartz.html
 
 #### Local H2 console
 http://localhost:8080/h2-console
 JDBC URL: jdbc:h2:~/projects/com.ail/job-service/db/data
 
 #### Get all jobs
+
 ```
 curl -i http://localhost:8080/job-service/jobs
 ```
+
 #### Create new job
+
 ```
 curl -i -X POST http://localhost:8080/job-service/create -H "Content-Type: application/json" -d @job1.json
 ```
+
+Commands can depend on OS if you are running the native commands. But you always can run commands like:
+
+```
+java -jar some-worker.jar
+```
+The only requirement is Java-application should finish work with success exit status code ```0``` or
+any other error status code.
+Application should take care about rollback itself, because it's not the responsibility of the Job Service
+and it is impossible to predict every failure situation (not to mention how to do rollback).
+Examples of json files for testing native ping on Linux (for Windows you have to change the command attribute
+```-c``` to ```-n```)
+
 job1.json:
 ```
 {
@@ -32,6 +49,7 @@ job1.json:
 	"cron":"0/30 * * * * ?"
 }
 ```
+
 job2.json:
 ```
 {
@@ -41,8 +59,12 @@ job2.json:
 	"priority":"10"
 }
 ```
+
 #### Execute created job one time manually
+
 ```
 curl -i -X POST http://localhost:8080/job-service/execute/job1
 curl -i -X POST http://localhost:8080/job-service/execute/job2
 ```
+
+We can do logging of each NativeJob execution into separate log-file with one of existing Quartz plugins
