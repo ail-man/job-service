@@ -131,7 +131,7 @@ public class JobServiceRestControllerTest {
 
         given(jobService.getJobInfo("job1")).willReturn(job);
 
-        mvc.perform(get("/job-service/jobInfo/job1")
+        mvc.perform(get("/job-service/job-info/job1")
                 .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.name", is("job1")))

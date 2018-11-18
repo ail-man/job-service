@@ -46,7 +46,7 @@ public class JobServiceRestController {
         jobService.delete(jobName);
     }
 
-    @GetMapping("/jobInfo/{jobName}")
+    @GetMapping("/job-info/{jobName}")
     public JobInfo getJob(@PathVariable String jobName) {
         return mapper.map(jobService.getJobInfo(jobName), JobInfo.class);
     }
