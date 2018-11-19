@@ -33,8 +33,8 @@ Of course, this Job Service supports scheduling with cron expressions (otherwise
 Also jobs can be executed manually.
 
 #### Configuration
-You can configure the maximum thread pool capacity with in
-```<project_path>/src/main/resources/application.properties``` file:
+You can configure the maximum thread pool capacity in
+```<project_path>/src/main/resources/application.properties``` file with property:
 ```
 spring.quartz.properties.org.quartz.threadPool.threadCount=5
 ```
@@ -43,7 +43,7 @@ spring.quartz.properties.org.quartz.threadPool.threadCount=5
 
 #### Run with spring-boot-maven-plugin
 ```
-mvn clean test spring-boot:run
+mvn spring-boot:run
 ```
 or
 ```
@@ -75,8 +75,6 @@ curl -i -X POST http://localhost:8080/job-service/update -H "Content-Type: appli
 
 
 #### Examples of ```job.json``` file
-
-For Linux only:
 ```
 {
 	"name":"job1",
@@ -183,7 +181,7 @@ You can see all DB tables in H2 DB management console. Just open the page while 
 ```
 http://localhost:8080/h2-console
 ```
-and provide property for connection
+and provide property value for connection
 ```
 JDBC URL: jdbc:h2:<project_path>/db/data
 ```
@@ -199,9 +197,9 @@ After that you will have all tables recreated.
 * Support of fixed-delay and fixed-rate schedules
 * Clearer API and code
 * Improve tests and add more tests
-* Using Docker
+* Use Docker
 * Save logs for each separate job execution to separate log-file
-* Split REST service to separate maven module. I would allow to use only common service functionality.
+* Split REST service to separate maven module. It would allow to use only common service functionality.
 * UI
 * to be continued...
 
