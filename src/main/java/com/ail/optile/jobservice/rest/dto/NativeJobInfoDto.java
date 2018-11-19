@@ -1,4 +1,4 @@
-package com.ail.optile.jobservice.dto;
+package com.ail.optile.jobservice.rest.dto;
 
 import lombok.*;
 
@@ -7,7 +7,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class JobInfo {
+public class NativeJobInfoDto {
 
     private String name;
     private String command;

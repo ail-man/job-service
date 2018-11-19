@@ -1,9 +1,9 @@
 package com.ail.optile.jobservice.config;
 
+import com.ail.optile.jobservice.api.JobService;
 import com.ail.optile.jobservice.listener.JobExecutionListener;
 import com.ail.optile.jobservice.listener.JobTriggerListener;
 import com.ail.optile.jobservice.repository.JobExecutionHistoryRepository;
-import com.ail.optile.jobservice.service.JobService;
 import com.ail.optile.jobservice.service.JobServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.dozer.DozerBeanMapper;
@@ -19,9 +19,10 @@ import org.springframework.context.annotation.Configuration;
 public class AppConfiguration {
 
     @Autowired
-    public void registerJobListener(Scheduler scheduler,
-                                    JobExecutionListener jobExecutionListener,
-                                    JobTriggerListener jobTriggerListener) {
+    public void registerJobListener(
+            Scheduler scheduler,
+            JobExecutionListener jobExecutionListener,
+            JobTriggerListener jobTriggerListener) {
         try {
             scheduler.getListenerManager().addJobListener(jobExecutionListener);
             scheduler.getListenerManager().addTriggerListener(jobTriggerListener);

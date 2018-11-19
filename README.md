@@ -1,9 +1,9 @@
 ## Job Service Project
 
 #### Used technologies
+* Quartz
 * Maven
 * Spring Boot
-* Quartz
 * H2 DB
 * RESTful services
 * a lot of hidden tech-stack...
@@ -12,8 +12,8 @@
 
 #### Flexibility
 For the purpose of flexibility it was decided that Job Service would be able run commands which, actually, could be run
-from the command-line. This way it can be not only Java classes (which could be executed as a Job), but also you can
-execute any program as a Job.
+from the commandline. This way it can be not only Java classes (which could be executed as a job), but also you can
+execute any program as a job.
 
 #### Reliability
 Actually, it is impossible to predict every failure situation if not to mention how to do rollback.
@@ -22,19 +22,28 @@ by itself.
 
 #### Internal Consistency
 Job Service can provide you information about jobs' status at any moment of time by invoking methods ```getJobInfo()```
-or ```getAllJobs```.
+or ```getAllJobs()```.
 
 #### Priority
-Job Service supports priority.
+Yes, this Job Service supports jobs prioritization.
 
 #### Scheduling
-Job Service supports scheduling with cron expressions. Also jobs can be executed manually.
+Of course, this Job Service supports scheduling with cron expressions (otherwise, why it should exist... :)
+
+Also jobs can be executed manually.
+
+#### Configuration
+You can configure the maximum thread pool capacity with in
+```<project_path>/src/main/resources/application.properties``` file:
+```
+spring.quartz.properties.org.quartz.threadPool.threadCount=5
+```
 
 ## Running and testing
 
 #### Run with spring-boot-maven-plugin
 ```
-mvn spring-boot:run
+mvn clean test spring-boot:run
 ```
 or
 ```
@@ -42,7 +51,16 @@ mvn clean package
 java -jar <this-project-path>/target/job-service-0.0.1-SNAPSHOT.jar
 ```
 
-## Rest API
+## Manual testing of Rest API
+All commands illustrated below are for Linux commandline.
+
+For Windows commandline you will probably need to send the JSON content as a text (not as a file) with CURL utility.
+
+Example of using CURL in Windows is:
+```
+curl -i -X POST http://localhost:8080/job-service/create -H "Content-Type: application/json" -d "{\"name\":\"job1\",\"command\":\"ping localhost -n 4\",\"cron\":\"0/20 * * * * ?\"}"
+```
+
 #### Create new job
 ```
 curl -i -X POST http://localhost:8080/job-service/create -H "Content-Type: application/json" -d @job.json
@@ -55,28 +73,6 @@ curl -i -X POST http://localhost:8080/job-service/update -H "Content-Type: appli
 ```
 , where ```job.json``` contains ```name``` of existing job. 
 
-#### Execute created job one time manually
-```
-curl -i -X POST http://localhost:8080/job-service/execute/job1
-```
-, where ```job1``` is the job's ```name``` (id), which was defined in ```job.json``` file upon creation.
-
-#### Get job info
-```
-curl -i -X GET http://localhost:8080/job-service/job-info/job1
-```
-, where ```job1``` is the job ```name``` (id), which was defined in ```job.json``` file upon creation.
-
-#### Delete job
-```
-curl -i -X POST http://localhost:8080/job-service/delete/job1
-```
-, where ```job1``` is the job ```name``` (id), which was defined in ```job.json``` file upon creation.
-
-#### Get all jobs
-```
-curl -i -X GET http://localhost:8080/job-service/jobs
-```
 
 #### Examples of ```job.json``` file
 
@@ -88,7 +84,7 @@ For Linux only:
 	"cron":"0/30 * * * * ?"
 }
 ```
-For any OS:
+or
 ```
 {
 	"name":"job2",
@@ -117,11 +113,39 @@ or even this
 For necessary cron expressions see
 http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/crontrigger.html
 
-### Requirements for NativeJobs
-Actually, there are no special requirements. You can run everything you want (as in commandline of your favorite OS).
+#### Execute created job once manually
+```
+curl -i -X POST http://localhost:8080/job-service/execute/job1
+```
+, where ```job1``` is the job's ```name```, which was defined in ```job.json``` file upon creation.
 
-But if you want to see the final status of the last job execution then your Job should provide the exit status code upon
-completion. Native OS commands usually provide it by default.
+#### Get job info
+```
+curl -i -X GET http://localhost:8080/job-service/job-info/job1
+```
+, where ```job1``` is the job ```name```, which was defined in ```job.json``` file upon creation.
+
+#### Delete job
+```
+curl -i -X POST http://localhost:8080/job-service/delete/job1
+```
+, where ```job1``` is the job ```name```, which was defined in ```job.json``` file upon creation.
+
+#### Get all jobs
+```
+curl -i -X GET http://localhost:8080/job-service/jobs
+```
+
+### Requirements for Native Jobs
+All commands above are considered as a Native Jobs because they can be run with native commandline of your favorite OS.
+
+To handle this commands ```NativeJob``` class is used from Quartz 2.3.1-SNAPSHOT (I'm sorry for using not released
+yet functionality).
+
+Actually, there are no special requirements for Native Jobs.
+
+But if you want to monitor the result status of the last job execution, then your job should provide the exit status
+code upon completion. Native OS commands usually provide it by default.
 In simple Java program this status can be set with:
 ```
 System.exit(0); // SUCCESS
@@ -132,7 +156,7 @@ System.exit(1); // FAILED
 ```
 Exit status code ```0``` is always considered as ```SUCCESS```. Any others - as ```FAILED```.
 
-Also be aware that for native jobs ```command```-property in job-json can depend on the current OS.
+Also be aware that for native jobs ```command```-property in json can depend on the current OS.
 
 For example this command for Linux will not work for Windows:
 ```
@@ -143,20 +167,50 @@ For Windows we need use:
 ping localhost -n 5
 ```
 
+## Extending this Job Management System with Java classes
+To provide other developers possibility to create jobs right inside this system the class ```JavaJobRequest``` was
+provided. Because of the lack of time, this class is ugly and not so convenient to use... but you can check how
+to create the job instance in Java code (check for ```JavaJobRequestImpl``` inside ```JavaJobIntegrationTest```)
+
 ## Additional features
 
-#### Local H2 console
-http://localhost:8080/h2-console
-JDBC URL: jdbc:h2:<project_path>/db/data
+#### Job Execution History
+For each job this application stores all execution history in H2 DB. You can check it out in table
+```JOB_EXECUTION_HISTORY ``` via H2 DB console
 
-#### H2 Database
-H2 database data file is located in ```db``` folder of this project (it's skipped by ```.gitignore```) file
-If you need to drop all data then just remove this directory and you will have all data created from scratch.
+#### Local H2 DB console
+You can see all DB tables in H2 DB management console. Just open the page while application is running:
+```
+http://localhost:8080/h2-console
+```
+and provide property for connection
+```
+JDBC URL: jdbc:h2:<project_path>/db/data
+```
+,where ```<project_path>``` is full path of current project.
+
+#### Manual H2 Database Cleanup
+H2 database data is located in ```db``` folder of this project (it's skipped by ```.gitignore```).
+If you need to drop all data then just remove this directory and restart the application.
+After that you will have all tables recreated.
 
 ## What can be done better... but later
+* Stop and pause jobs
+* Support of fixed-delay and fixed-rate schedules
+* Clearer API and code
+* Improve tests and add more tests
+* Using Docker
 * Save logs for each separate job execution to separate log-file
-* More tests
+* Split REST service to separate maven module. I would allow to use only common service functionality.
 * UI
+* to be continued...
+
+## Postscript
+Since development is an endless process, therefore the requirements - are the only thing which able to stop a developer
+from the endless improvement of the system.
+
+For this project the requirements were fulfilled one commit ago, and the last commit just simply brought more chaos
+to the universe by adding more rows of imperfect code (and more bugs accordingly) :)
 
 #### Resources used
 * http://www.quartz-scheduler.org/documentation/

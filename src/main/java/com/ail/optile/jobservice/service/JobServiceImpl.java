@@ -1,24 +1,29 @@
 package com.ail.optile.jobservice.service;
 
-import com.ail.optile.jobservice.domain.Job;
-import com.ail.optile.jobservice.exception.JobIsCurrentlyRunningException;
-import com.ail.optile.jobservice.exception.JobNotFoundException;
-import com.ail.optile.jobservice.exception.JobServiceException;
+import com.ail.optile.jobservice.api.JobInfo;
+import com.ail.optile.jobservice.api.JobRequest;
+import com.ail.optile.jobservice.api.JobService;
+import com.ail.optile.jobservice.api.exception.*;
+import com.ail.optile.jobservice.domain.JavaJobInfo;
+import com.ail.optile.jobservice.domain.NativeJobInfo;
+import com.ail.optile.jobservice.domain.NativeJobRequest;
 import com.ail.optile.jobservice.pdo.JobExecutionHistory;
 import com.ail.optile.jobservice.quartz.NativeJob;
 import com.ail.optile.jobservice.repository.JobExecutionHistoryRepository;
+import com.ail.optile.jobservice.rest.exception.UnexpectedRestException;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.*;
 import org.quartz.impl.matchers.GroupMatcher;
 import org.quartz.utils.Key;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-
+@Service
 @Slf4j
 public class JobServiceImpl implements JobService {
 
@@ -32,140 +37,167 @@ public class JobServiceImpl implements JobService {
     }
 
     @Override
-    public void create(Job job) {
-        JobDetail jobDetail = buildJobDetail(job);
-        Trigger trigger = buildCronTrigger(job);
+    @Transactional
+    public void create(JobRequest jobRequest) throws IncorrectJobRequestException, JobAlreadyExistsException {
+        if (checkJobExists(jobRequest.getName())) {
+            log.error("Job '{}' is already exists", jobRequest.getName());
+            throw new JobAlreadyExistsException();
+        }
+
+        JobDetail jobDetail = buildJobDetail(jobRequest);
+        Trigger trigger = buildCronTrigger(jobRequest);
 
         try {
             scheduler.scheduleJob(jobDetail, trigger);
-            log.info("Job '{}' created", job.getName());
+            log.info("Job '{}' created", jobRequest.getName());
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedException(e);
         }
     }
 
     @Override
-    public void execute(String jobName) {
-        try {
-            checkJobExists(jobName);
+    public void execute(String jobName) throws JobIsNotFoundException, JobIsCurrentlyRunningException {
+        throwJobIsNotFoundExceptionIfJobNotExists(jobName);
 
-            for (JobExecutionContext jobExecutionContext : scheduler.getCurrentlyExecutingJobs()) {
-                if (Objects.equals(jobName, jobExecutionContext.getJobDetail().getKey().getName())) {
-                    log.error("Job '{}' is currently running", jobName);
-                    throw new JobIsCurrentlyRunningException();
-                }
-            }
+        try {
+            throwExceptionIfRunning(jobName);
 
             scheduler.triggerJob(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
             log.info("Job '{}' executed", jobName);
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedException(e);
+        }
+    }
+
+    private void throwExceptionIfRunning(String jobName) throws SchedulerException, JobIsCurrentlyRunningException {
+        if (checkJobIsCurrentlyRunning(jobName)) {
+            log.error("Job '{}' is currently running", jobName);
+            throw new JobIsCurrentlyRunningException();
+        }
+    }
+
+    private boolean checkJobIsCurrentlyRunning(String jobName) throws SchedulerException {
+        for (JobExecutionContext jobExecutionContext : scheduler.getCurrentlyExecutingJobs()) {
+            if (Objects.equals(jobName, jobExecutionContext.getJobDetail().getKey().getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void throwJobIsNotFoundExceptionIfJobNotExists(String jobName) throws JobIsNotFoundException {
+        if (!checkJobExists(jobName)) {
+            log.error("Job '{}' is not found", jobName);
+            throw new JobIsNotFoundException();
         }
     }
 
     @Override
     @Transactional
-    public void update(Job job) {
+    public void update(JobRequest jobRequest) throws JobIsNotFoundException, IncorrectJobRequestException, JobIsCurrentlyRunningException {
+        throwJobIsNotFoundExceptionIfJobNotExists(jobRequest.getName());
+
         try {
-            checkJobExists(job.getName());
-
-            scheduler.deleteJob(JobKey.jobKey(job.getName(), Key.DEFAULT_GROUP));
-
-            JobDetail jobDetail = buildJobDetail(job);
-            Trigger trigger = buildCronTrigger(job);
-
-            scheduler.scheduleJob(jobDetail, trigger);
-            log.info("Job '{}' updated", job.getName());
+            throwExceptionIfRunning(jobRequest.getName());
+            scheduler.deleteJob(JobKey.jobKey(jobRequest.getName(), Key.DEFAULT_GROUP));
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedException(e);
+        }
+
+        JobDetail jobDetail = buildJobDetail(jobRequest);
+        Trigger trigger = buildCronTrigger(jobRequest);
+
+        try {
+            scheduler.scheduleJob(jobDetail, trigger);
+            log.info("Job '{}' updated", jobRequest.getName());
+        } catch (SchedulerException e) {
+            log.error(e.getMessage(), e);
+            throw new UnexpectedException(e);
         }
     }
 
     @Override
     @Transactional
-    public void delete(String jobName) {
+    public void delete(String jobName) throws JobIsNotFoundException, JobIsCurrentlyRunningException {
+        throwJobIsNotFoundExceptionIfJobNotExists(jobName);
+
         try {
-            checkJobExists(jobName);
+            throwExceptionIfRunning(jobName);
 
             scheduler.deleteJob(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
             historyRepository.deleteAllByJobName(jobName);
             log.info("Job '{}' deleted", jobName);
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedException(e);
         }
     }
 
     @Override
-    public Job getJobInfo(String jobName) {
+    public JobInfo getJobInfo(String jobName) throws JobIsNotFoundException {
+        throwJobIsNotFoundExceptionIfJobNotExists(jobName);
+
         try {
-            checkJobExists(jobName);
-            return getJob(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
+            return getJobInfo(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedRestException(e);
         }
     }
 
     @Override
-    public List<Job> getAllJobs() {
+    public List<JobInfo> getAllJobs() {
         try {
-            List<Job> jobs = new ArrayList<>();
+            List<JobInfo> jobs = new ArrayList<>();
 
             for (JobKey jobKey : scheduler.getJobKeys(GroupMatcher.groupEquals(Key.DEFAULT_GROUP))) {
-                jobs.add(getJob(jobKey));
+                jobs.add(getJobInfo(jobKey));
             }
 
             return jobs;
         } catch (SchedulerException e) {
             log.error(e.getMessage(), e);
-            throw new JobServiceException(e);
+            throw new UnexpectedException(e);
         }
     }
 
-    private void checkJobExists(String jobName) throws SchedulerException {
-        if (!scheduler.checkExists(JobKey.jobKey(jobName, Key.DEFAULT_GROUP))) {
-            throw new JobNotFoundException();
-        }
-    }
-
-    private CronTrigger buildCronTrigger(Job job) {
-        return TriggerBuilder.newTrigger()
-                .withSchedule(CronScheduleBuilder.cronSchedule(job.getCron()))
-                .withPriority(job.getPriority() != null ? job.getPriority() : Trigger.DEFAULT_PRIORITY)
-                .build();
-    }
-
-    private JobDetail buildJobDetail(Job job) {
-        return JobBuilder.newJob(NativeJob.class)
-                .withIdentity(job.getName(), Key.DEFAULT_GROUP)
-                .usingJobData(NativeJob.PROP_COMMAND, job.getCommand())
-                .usingJobData(NativeJob.PROP_CONSUME_STREAMS, true)
-                .build();
-    }
-
-    private Job getJob(JobKey jobKey) throws SchedulerException {
+    private JobInfo getJobInfo(JobKey jobKey) throws SchedulerException {
         String jobName = jobKey.getName();
-        String jobCommand = getJobCommand(jobKey);
+        Class jobClass = getJobClass(jobKey);
         String jobCron = getJobCron(jobKey);
         Integer jobPriority = getJobPriority(jobKey);
-        Job.State jobState = getJobState(jobKey);
+        JobInfo.State jobState = getJobState(jobKey);
 
-        return Job.builder()
-                .name(jobName)
-                .command(jobCommand)
-                .cron(jobCron)
-                .state(jobState)
-                .priority(jobPriority)
-                .build();
+        if (NativeJob.class.equals(jobClass)) {
+            String jobCommand = getJobCommand(jobKey);
+            return NativeJobInfo.builder()
+                    .name(jobName)
+                    .command(jobCommand)
+                    .cron(jobCron)
+                    .state(jobState)
+                    .priority(jobPriority)
+                    .build();
+        } else {
+            return JavaJobInfo.builder()
+                    .name(jobName)
+                    .cron(jobCron)
+                    .state(jobState)
+                    .priority(jobPriority)
+                    .build();
+        }
     }
 
-    private Job.State getJobState(JobKey jobKey) throws SchedulerException {
+    private Class getJobClass(JobKey jobKey) throws SchedulerException {
+        JobDetail jobDetail = scheduler.getJobDetail(jobKey);
+        return jobDetail.getJobClass();
+    }
+
+    private JobInfo.State getJobState(JobKey jobKey) throws SchedulerException {
         if (isJobRunning(jobKey)) {
-            return Job.State.RUNNING;
+            return JobInfo.State.RUNNING;
         }
 
         JobExecutionHistory jobExecutionHistory =
@@ -175,13 +207,13 @@ public class JobServiceImpl implements JobService {
             JobExecutionHistory.Result result = jobExecutionHistory.getResult();
             switch (result) {
                 case SUCCESS:
-                    return Job.State.SUCCESS;
+                    return JobInfo.State.SUCCESS;
                 case FAILED:
-                    return Job.State.FAILED;
+                    return JobInfo.State.FAILED;
             }
         }
 
-        return Job.State.QUEUED;
+        return JobInfo.State.QUEUED;
     }
 
     private boolean isJobRunning(JobKey jobKey) throws SchedulerException {
@@ -217,5 +249,46 @@ public class JobServiceImpl implements JobService {
     @SuppressWarnings("unchecked")
     private Integer getJobPriority(JobKey jobKey) throws SchedulerException {
         return scheduler.getTriggersOfJob(jobKey).get(0).getPriority();
+    }
+
+    private boolean checkJobExists(String jobName) {
+        try {
+            return scheduler.checkExists(JobKey.jobKey(jobName, Key.DEFAULT_GROUP));
+        } catch (SchedulerException e) {
+            log.error(e.getMessage(), e);
+            throw new UnexpectedException(e);
+        }
+    }
+
+    private CronTrigger buildCronTrigger(JobRequest jobRequest) throws IncorrectJobRequestException {
+        try {
+            return TriggerBuilder.newTrigger()
+                    .withSchedule(CronScheduleBuilder.cronSchedule(jobRequest.getCron()))
+                    .withPriority(
+                            jobRequest.getPriority() != null ? jobRequest.getPriority() : Trigger.DEFAULT_PRIORITY)
+                    .build();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new IncorrectJobRequestException(e);
+        }
+    }
+
+    private JobDetail buildJobDetail(JobRequest jobRequest) throws IncorrectJobRequestException {
+        try {
+            if (jobRequest instanceof NativeJobRequest) {
+                return JobBuilder.newJob(NativeJob.class)
+                        .withIdentity(jobRequest.getName(), Key.DEFAULT_GROUP)
+                        .usingJobData(NativeJob.PROP_COMMAND, ((NativeJobRequest) jobRequest).getCommand())
+                        .usingJobData(NativeJob.PROP_CONSUME_STREAMS, true)
+                        .build();
+            } else {
+                return JobBuilder.newJob(jobRequest.getClass())
+                        .withIdentity(jobRequest.getName(), Key.DEFAULT_GROUP)
+                        .build();
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new IncorrectJobRequestException(e);
+        }
     }
 }

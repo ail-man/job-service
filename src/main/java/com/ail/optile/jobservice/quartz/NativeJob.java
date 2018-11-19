@@ -126,18 +126,14 @@ public class NativeJob implements Job {
 
     }
 
-    protected Logger getLog() {
-        return log;
-    }
-
-    private Integer runNativeCommand(String command, String parameters, boolean wait, boolean consumeStreams) throws JobExecutionException {
+    private Integer runNativeCommand(String command, String parameters, boolean wait, boolean consumeStreams)
+            throws JobExecutionException {
 
         String[] cmd;
         String[] args = new String[2];
         Integer result = null;
         args[0] = command;
         args[1] = parameters;
-
 
         try {
             //with this variable will be done the swithcing
@@ -158,7 +154,7 @@ public class NativeJob implements Job {
                 cmd[0] = "/bin/sh";
                 cmd[1] = "-c";
                 cmd[2] = args[0] + " " + args[1];
-            } else { // try this... 
+            } else { // try this...
                 cmd = args;
             }
 
@@ -188,6 +184,10 @@ public class NativeJob implements Job {
         return result;
     }
 
+    protected Logger getLog() {
+        return log;
+    }
+
     /**
      * Consumes data from the given input stream until EOF and prints the data to stdout
      *
@@ -195,6 +195,7 @@ public class NativeJob implements Job {
      * @author jhouse
      */
     class StreamConsumer extends Thread {
+
         InputStream is;
         String type;
 

@@ -31,8 +31,9 @@ public class JobTriggerListener implements TriggerListener {
     }
 
     @Override
-    public void triggerComplete(Trigger trigger,
-                                JobExecutionContext context,
-                                Trigger.CompletedExecutionInstruction triggerInstructionCode) {
+    public void triggerComplete(
+            Trigger trigger,
+            JobExecutionContext context,
+            Trigger.CompletedExecutionInstruction triggerInstructionCode) {
     }
 }

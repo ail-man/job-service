@@ -1,5 +1,6 @@
-package com.ail.optile.jobservice.dto;
+package com.ail.optile.jobservice.domain;
 
+import com.ail.optile.jobservice.api.JobInfo;
 import lombok.*;
 
 @Getter
@@ -7,10 +8,11 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class JobRequest {
+public class NativeJobInfo implements JobInfo {
 
     private String name;
     private String command;
     private String cron;
     private Integer priority;
+    private JobInfo.State state;
 }

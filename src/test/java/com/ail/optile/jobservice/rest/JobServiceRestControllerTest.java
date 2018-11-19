@@ -1,9 +1,13 @@
 package com.ail.optile.jobservice.rest;
 
-import com.ail.optile.jobservice.domain.Job;
-import com.ail.optile.jobservice.exception.JobIsCurrentlyRunningException;
-import com.ail.optile.jobservice.exception.JobNotFoundException;
-import com.ail.optile.jobservice.service.JobService;
+import com.ail.optile.jobservice.api.JobInfo;
+import com.ail.optile.jobservice.api.JobRequest;
+import com.ail.optile.jobservice.api.JobService;
+import com.ail.optile.jobservice.api.exception.IncorrectJobRequestException;
+import com.ail.optile.jobservice.api.exception.JobAlreadyExistsException;
+import com.ail.optile.jobservice.api.exception.JobIsCurrentlyRunningException;
+import com.ail.optile.jobservice.api.exception.JobIsNotFoundException;
+import com.ail.optile.jobservice.domain.NativeJobInfo;
 import com.google.common.collect.ImmutableList;
 import org.dozer.DozerBeanMapper;
 import org.dozer.Mapper;
@@ -60,6 +64,20 @@ public class JobServiceRestControllerTest {
     }
 
     @Test
+    public void testIncorrectJobRequestRestException() throws Exception {
+        doThrow(new IncorrectJobRequestException(new IllegalArgumentException()))
+                .when(jobService).create(any(JobRequest.class));
+        mvc.perform(post("/job-service/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "\t\"name\":\"job1\",\n" +
+                        "\t\"command\":\"ping localhost -c 4\",\n" +
+                        "\t\"cron\":\"\"\n" +
+                        "}"))
+                .andExpect(status().isUnprocessableEntity());
+    }
+
+    @Test
     public void testCreateJob() throws Exception {
         mvc.perform(post("/job-service/create")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -72,12 +90,25 @@ public class JobServiceRestControllerTest {
     }
 
     @Test
+    public void testJobAlreadyExistsRestException() throws Exception {
+        doThrow(new JobAlreadyExistsException()).when(jobService).create(any(JobRequest.class));
+        mvc.perform(post("/job-service/create")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "\t\"name\":\"job1\",\n" +
+                        "\t\"command\":\"ping localhost -c 4\",\n" +
+                        "\t\"cron\":\"0/30 * * * * ?\"\n" +
+                        "}"))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
     public void testExecuteJob() throws Exception {
         doNothing().when(jobService).execute("job1");
         mvc.perform(post("/job-service/execute/job1"))
                 .andExpect(status().isOk());
 
-        doThrow(new JobNotFoundException()).when(jobService).execute("job2");
+        doThrow(new JobIsNotFoundException()).when(jobService).execute("job2");
         mvc.perform(post("/job-service/execute/job2"))
                 .andExpect(status().isNotFound());
 
@@ -97,7 +128,7 @@ public class JobServiceRestControllerTest {
                         "}"))
                 .andExpect(status().isOk());
 
-        doThrow(new JobNotFoundException()).when(jobService).update(any(Job.class));
+        doThrow(new JobIsNotFoundException()).when(jobService).update(any(JobRequest.class));
         mvc.perform(post("/job-service/update")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\n" +
@@ -106,6 +137,16 @@ public class JobServiceRestControllerTest {
                         "\t\"cron\":\"0/20 * * * * ?\"\n" +
                         "}"))
                 .andExpect(status().isNotFound());
+
+        doThrow(new JobIsCurrentlyRunningException()).when(jobService).update(any(JobRequest.class));
+        mvc.perform(post("/job-service/update")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\n" +
+                        "\t\"name\":\"job2\",\n" +
+                        "\t\"command\":\"ping localhost -c 4\",\n" +
+                        "\t\"cron\":\"0/20 * * * * ?\"\n" +
+                        "}"))
+                .andExpect(status().isImUsed());
     }
 
     @Test
@@ -114,19 +155,23 @@ public class JobServiceRestControllerTest {
         mvc.perform(post("/job-service/delete/job1"))
                 .andExpect(status().isOk());
 
-        doThrow(new JobNotFoundException()).when(jobService).delete("job2");
+        doThrow(new JobIsNotFoundException()).when(jobService).delete("job2");
         mvc.perform(post("/job-service/delete/job2"))
                 .andExpect(status().isNotFound());
+
+        doThrow(new JobIsCurrentlyRunningException()).when(jobService).delete("job3");
+        mvc.perform(post("/job-service/delete/job3"))
+                .andExpect(status().isImUsed());
     }
 
     @Test
     public void testGetJobInfo() throws Exception {
-        Job job = Job.builder()
+        NativeJobInfo job = NativeJobInfo.builder()
                 .name("job1")
                 .command("ping localhost -c 5")
                 .cron("0/20 * * * * ?")
                 .priority(10)
-                .state(Job.State.QUEUED)
+                .state(NativeJobInfo.State.QUEUED)
                 .build();
 
         given(jobService.getJobInfo("job1")).willReturn(job);
@@ -143,19 +188,19 @@ public class JobServiceRestControllerTest {
 
     @Test
     public void testGetJobs() throws Exception {
-        List<Job> jobs = ImmutableList.of(
-                Job.builder()
+        List<JobInfo> jobs = ImmutableList.of(
+                NativeJobInfo.builder()
                         .name("job1")
                         .command("ping localhost -c 5")
                         .cron("0/20 * * * * ?")
-                        .state(Job.State.FAILED)
+                        .state(NativeJobInfo.State.FAILED)
                         .priority(5)
                         .build(),
-                Job.builder()
+                NativeJobInfo.builder()
                         .name("job2")
                         .command("echo 'hello' >> test")
                         .cron("0/30 * * * * ?")
-                        .state(Job.State.RUNNING)
+                        .state(NativeJobInfo.State.RUNNING)
                         .priority(10)
                         .build()
         );
