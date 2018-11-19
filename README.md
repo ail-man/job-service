@@ -1,34 +1,34 @@
-## Job Service Description
-Creates separate processes with NativeJob
-TODO
+## Job Service Project
 
 #### Used technologies
-* Spring Boot
 * Maven
-* Rest
+* Spring Boot
+* Quartz
 * H2 DB
-* TODO
+* RESTful services
+* a lot of hidden tech-stack...
 
 ## Fulfilling of requirements
 
 #### Flexibility
-TODO
+For the purpose of flexibility it was decided that Job Service would be able run commands which, actually, could be run
+from the command-line. This way it can be not only Java classes (which could be executed as a Job), but also you can
+execute any program as a Job.
 
 #### Reliability
-Job Service should not know how to rollback actions already performed by Job in case of Job failure.
-It is the only responsibility of Job itself!
-Application should take care about rollback itself, because it's not the responsibility of the Job Service
-Actually, it is impossible to predict every failure situation (not to mention how to do rollback).
-
+Actually, it is impossible to predict every failure situation if not to mention how to do rollback.
+Therefore it was decided that application (or command), which will be executed as a job, should take care about rollback
+by itself.
 
 #### Internal Consistency
-TODO
+Job Service can provide you information about jobs' status at any moment of time by invoking methods ```getJobInfo()```
+or ```getAllJobs```.
 
 #### Priority
-TODO
+Job Service supports priority.
 
 #### Scheduling
-TODO
+Job Service supports scheduling with cron expressions. Also jobs can be executed manually.
 
 ## Running and testing
 
@@ -59,7 +59,7 @@ curl -i -X POST http://localhost:8080/job-service/update -H "Content-Type: appli
 ```
 curl -i -X POST http://localhost:8080/job-service/execute/job1
 ```
-, where ```job1``` is the job ```name``` (id), which was defined in ```job.json``` file upon creation. 
+, where ```job1``` is the job's ```name``` (id), which was defined in ```job.json``` file upon creation.
 
 #### Get job info
 ```
@@ -102,7 +102,7 @@ or
 {
 	"name":"job3",
 	"command":"java -jar some-job.jar",
-	"cron":"0 0 12 * * ?",
+	"cron":"0 10,44 14 ? 3 WED",
 	"priority":"15"
 }
 ```
@@ -117,19 +117,20 @@ or even this
 For necessary cron expressions see
 http://www.quartz-scheduler.org/documentation/quartz-2.x/tutorials/crontrigger.html
 
-We can do logging of each NativeJob execution into separate log-file with one of existing Quartz plugins
+### Requirements for NativeJobs
+Actually, there are no special requirements. You can run everything you want (as in commandline of your favorite OS).
 
-### Requirements for Jobs
-Actually, there are no special requirements. You can run everything you want as in commandline of your
-favorite OS.
-
-But if you want to see the final status of the last job execution then you need to provide the
-exit status code upon Job completion. Native OS commands usually provide it by default.
+But if you want to see the final status of the last job execution then your Job should provide the exit status code upon
+completion. Native OS commands usually provide it by default.
 In simple Java program this status can be set with:
 ```
-System.exit(1);
+System.exit(0); // SUCCESS
 ```
-Exit status code ```0``` is always considered as ```SUCCESS```.
+or
+```
+System.exit(1); // FAILED
+```
+Exit status code ```0``` is always considered as ```SUCCESS```. Any others - as ```FAILED```.
 
 Also be aware that for native jobs ```command```-property in job-json can depend on the current OS.
 
@@ -146,7 +147,7 @@ ping localhost -n 5
 
 #### Local H2 console
 http://localhost:8080/h2-console
-JDBC URL: jdbc:h2:~/projects/com.ail/job-service/db/data
+JDBC URL: jdbc:h2:<project_path>/db/data
 
 #### H2 Database
 H2 database data file is located in ```db``` folder of this project (it's skipped by ```.gitignore```) file
@@ -154,6 +155,8 @@ If you need to drop all data then just remove this directory and you will have a
 
 ## What can be done better... but later
 * Save logs for each separate job execution to separate log-file
+* More tests
+* UI
 
 #### Resources used
 * http://www.quartz-scheduler.org/documentation/
