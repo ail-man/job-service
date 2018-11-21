@@ -7,6 +7,9 @@ import com.ail.optile.jobservice.api.exception.JobIsNotFoundException;
 
 import java.util.List;
 
+/**
+ * TODO Split API for Trigger and Job
+ */
 public interface JobService {
 
     /**
